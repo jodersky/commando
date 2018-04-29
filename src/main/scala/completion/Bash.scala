@@ -1,4 +1,4 @@
-package cmd
+package commando
 package completion
 
 object Bash {

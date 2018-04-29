@@ -1,4 +1,4 @@
-package cmd
+package commando
 import scala.collection.mutable
 import scala.{Option => Maybe}
 
@@ -148,7 +148,7 @@ object Parser {
           } else if (!subcommands.isEmpty && subline.isEmpty) {
             val missing = command.commands.map(c => s"'${c.name}'")
             fatal(
-              s"subcommand not specified (must be either one of ${missing.mkString(", ")})")
+              s"command not specified (must be one of ${missing.mkString(", ")})")
           } else {
             CommandLine(command.name,
                         parsedOptions.toMap ++ parsedParameters.toMap,

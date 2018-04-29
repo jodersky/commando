@@ -1,4 +1,4 @@
-package cmd
+package commando
 
 import scala.{Option => Maybe}
 
@@ -56,7 +56,7 @@ case class Command(
 
   def usage: String = "Usage: " + subusage(0)
 
-  def completion: String = cmd.completion.Bash.completion(this)
+  def completion: String = commando.completion.Bash.completion(this)
 
 }
 object Command {

@@ -1,37 +1,37 @@
-package cmd
+package commando
 
 import utest._
 
 object CmdTests extends TestSuite {
 
-  val cbx = cmd.Command(
+  val cbx = commando.Command(
     "cbx",
-    cmd.Option("server", Some('s'), Some(cmd.Parameter("name"))),
-    cmd.Command(
+    commando.Option("server", Some('s'), Some(commando.Parameter("name"))),
+    commando.Command(
       "version",
-      cmd.Option("verbose", Some('v'), Some(cmd.Parameter("k=v", false)))),
-    cmd.Command("login",
-                cmd.Parameter("server_url"),
-                cmd.Parameter("username", false),
-                cmd.Parameter("password", false)),
-    cmd.Command("run",
-                cmd.Option("file", Some('f'), Some(cmd.Parameter("file_name"))),
-                cmd.Option("force", None),
-                cmd.Parameter("pipeline", false)),
-    cmd.Command("level1",
-                cmd.Command("level2-1",
-                            cmd.Parameter("p2"),
-                            cmd.Command("level3", cmd.Parameter("p3"))),
-                cmd.Command("level2-2"))
+      commando.Option("verbose", Some('v'), Some(commando.Parameter("k=v", false)))),
+    commando.Command("login",
+                commando.Parameter("server_url"),
+                commando.Parameter("username", false),
+                commando.Parameter("password", false)),
+    commando.Command("run",
+                commando.Option("file", Some('f'), Some(commando.Parameter("file_name"))),
+                commando.Option("force", None),
+                commando.Parameter("pipeline", false)),
+    commando.Command("level1",
+                commando.Command("level2-1",
+                            commando.Parameter("p2"),
+                            commando.Command("level3", commando.Parameter("p3"))),
+                commando.Command("level2-2"))
   )
 
-  def parse(in: String): CommandLine = cmd.parse(cbx, in.split(" ").tail) match {
+  def parse(in: String): CommandLine = commando.parse(cbx, in.split(" ").tail) match {
     case Left(ex) => throw ex
     case Right(res) => res
   }
 
   def shouldFail(in: String) =
-    assert(cmd.parse(cbx, in.split(" ").tail).isLeft)
+    assert(commando.parse(cbx, in.split(" ").tail).isLeft)
 
   val tests = Tests {
     "printUsage" - {

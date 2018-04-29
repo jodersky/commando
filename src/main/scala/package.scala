@@ -1,4 +1,4 @@
-package cmd
+package commando
 
 object `package` {
   def parse(command: Command,
