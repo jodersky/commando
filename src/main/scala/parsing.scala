@@ -71,10 +71,10 @@ object Parser {
       }
 
       def line(command: Command): CommandLine = {
-        val longs: Map[String, Option] = command.options.map {
+        val longs: Map[String, Optional] = command.options.map {
           case opt => opt.long -> opt
         }.toMap
-        val shorts: Map[String, Option] = command.options.collect {
+        val shorts: Map[String, Optional] = command.options.collect {
           case opt if opt.short.isDefined => opt.short.get.toString -> opt
         }.toMap
         val subcommands: Map[String, Command] = command.commands.map {

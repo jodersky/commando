@@ -1,12 +1,10 @@
 package commando
 
-import scala.{Option => Maybe}
-
 sealed trait Definition
 
-case class Option(long: String,
-                  short: Maybe[Char] = None,
-                  parameter: Maybe[Parameter] = None)
+case class Optional(long: String,
+                    short: Option[Char] = None,
+                    parameter: Option[Positional] = None)
     extends Definition {
   def argumentAllowed: Boolean = parameter.isDefined
   def argumentRequired: Boolean = parameter.map(_.required).getOrElse(false)
@@ -14,14 +12,14 @@ case class Option(long: String,
     val shortString = short.map(c => s"-$c|").getOrElse("")
     val argString = parameter match {
       case None                            => ""
-      case Some(Parameter(argName, false)) => s"[=<$argName>]"
-      case Some(Parameter(argName, true))  => s"=<$argName>"
+      case Some(Positional(argName, false)) => s"[=<$argName>]"
+      case Some(Positional(argName, true))  => s"=<$argName>"
     }
     s"[$shortString--$long$argString]"
   }
 }
 
-case class Parameter(
+case class Positional(
     name: String,
     required: Boolean = true
 ) extends Definition {
@@ -29,10 +27,10 @@ case class Parameter(
 }
 
 case class Command(
-    name: String,
-    options: Set[Option] = Set.empty,
-    parameters: Seq[Parameter] = Seq.empty,
-    commands: Set[Command] = Set.empty
+                name: String,
+                options: Set[Optional] = Set.empty,
+                parameters: Seq[Positional] = Seq.empty,
+                commands: Set[Command] = Set.empty
 ) extends Definition {
   override def toString = name
 
@@ -64,8 +62,8 @@ object Command {
   def apply(name: String, defs: Definition*): Command = {
     Command(
       name,
-      options = defs.collect { case opt: Option         => opt }.toSet,
-      parameters = defs.collect { case param: Parameter => param }.toSeq,
+      options = defs.collect { case opt: Optional         => opt }.toSet,
+      parameters = defs.collect { case param: Positional => param }.toSeq,
       commands = defs.collect { case cmd: Command       => cmd }.toSet
     )
   }
