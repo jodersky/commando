@@ -6,16 +6,16 @@ object CmdTests extends TestSuite {
 
   val cbx = commando.Command(
     "cbx",
-    commando.Optional("server", Some('s'), Some(commando.Positional("name"))),
+    commando.Optional("server", Some('s'), Optional.ArgRequired("name")),
     commando.Command(
       "version",
-      commando.Optional("verbose", Some('v'), Some(commando.Positional("k=v", false)))),
+      commando.Optional("verbose", Some('v'), Optional.ArgAllowed("k=v"))),
     commando.Command("login",
                 commando.Positional("server_url"),
                 commando.Positional("username", false),
                 commando.Positional("password", false)),
     commando.Command("run",
-                commando.Optional("file", Some('f'), Some(commando.Positional("file_name"))),
+                commando.Optional("file", Some('f'), Optional.ArgRequired("file_name")),
                 commando.Optional("force", None),
                 commando.Positional("pipeline", false)),
     commando.Command("level1",

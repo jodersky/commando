@@ -8,9 +8,9 @@ object Bash {
   }
 
   private def addFlags(command: Command): String = {
-    command.options.map { opt =>
+    command.optionals.map { opt =>
       val extra = if (opt.argumentRequired) "=" else ""
-      val short = opt.short.map(c => s"""flags+=("-${c}")""").getOrElse("")
+      val short = opt.short.map(c => s"""flags+=("-$c")""").getOrElse("")
       s"""|flags+=("--${opt.long}$extra")
           |$short
           |""".stripMargin
@@ -37,7 +37,7 @@ object Bash {
     }
   }
 
-  def completion(command: Command) = {
+  def completion(command: Command): String = {
     val name = command.name
 
     s"""__${name}_contains_word() {
@@ -89,7 +89,7 @@ object Bash {
        |    local c=0
        |    COMPREPLY=()
        |
-       |    local last_command="_${name}"
+       |    local last_command="_$name"
        |    local commands=()
        |    local flags=()
        |
@@ -100,7 +100,7 @@ object Bash {
        |
        |    return 0
        |}
-       |complete -o default -F __${name}_start ${name}
+       |complete -o default -F __${name}_start $name
        |""".stripMargin
   }
 

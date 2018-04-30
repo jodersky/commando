@@ -1,34 +1,27 @@
 package commando
 import scala.collection.mutable
-import scala.{Option => Maybe}
-
-case class CommandLine(
-    command: String,
-    arguments: Map[String, String],
-    subcommand: Maybe[CommandLine]
-)
 
 class ParseException(message: String) extends RuntimeException(message)
 
 object Parser {
   private sealed trait TokenKind
-  private case object SHORT extends TokenKind
-  private case object LONG extends TokenKind
-  private case object POSITIONAL extends TokenKind
-  private case object DOUBLE_DASH extends TokenKind
+  private case object SHORT extends TokenKind // -<n>
+  private case object LONG extends TokenKind // --<n>
+  private case object POSITIONAL extends TokenKind // <n>
+  private case object DOUBLE_DASH extends TokenKind // --
   private case object EOL extends TokenKind
 
   private case class Token(value: String, kind: TokenKind)
 
-  private def lex(input: Seq[String]) = new Iterator[Token] {
+  private def lex(input: Seq[String]): Iterator[Token] = new Iterator[Token] {
     val args = input.iterator
     val shortOptions = new mutable.Queue[Token]
 
     var escaping = false
-    def hasNext = args.hasNext || !shortOptions.isEmpty
+    override def hasNext: Boolean = args.hasNext || shortOptions.nonEmpty
 
-    def next(): Token =
-      if (!shortOptions.isEmpty) {
+    override def next(): Token =
+      if (shortOptions.nonEmpty) {
         shortOptions.dequeue()
       } else {
         val arg = args.next
@@ -51,8 +44,9 @@ object Parser {
       }
   }
 
-  def parse(command: Command,
-            args: Seq[String]): Either[ParseException, CommandLine] =
+  def parse(args: Seq[String],
+            command: Command,
+            onError: (Command, String) => Unit): Unit =
     try {
       val tokens: Iterator[Token] = lex(args)
       var token: Token = Token("end-of-line", EOL)
@@ -70,25 +64,40 @@ object Parser {
         tok
       }
 
-      def line(command: Command): CommandLine = {
-        val longs: Map[String, Optional] = command.options.map {
-          case opt => opt.long -> opt
-        }.toMap
-        val shorts: Map[String, Optional] = command.options.collect {
-          case opt if opt.short.isDefined => opt.short.get.toString -> opt
-        }.toMap
-        val subcommands: Map[String, Command] = command.commands.map {
-          case cmd => cmd.name -> cmd
+      val _parsedArguments = new mutable.HashMap[String, List[String]]
+      def addArgument(name: String, value: String): Unit =
+        _parsedArguments.get(name) match {
+          case None         => _parsedArguments(name) = value :: Nil
+          case Some(values) => _parsedArguments(name) = value :: values
+        }
+      def parsedArguments =
+        _parsedArguments.map {
+          case (key, values) =>
+            key -> values.reverse.toSeq
         }.toMap
 
-        def fatal(message: String) =
-          throw new ParseException(s"${command.name}: $message")
+      def line(command: Command): Unit = {
+        val longs: Map[String, Optional] = command.optionals.map {
+          case opt: Optional => opt.long -> opt
+        }.toMap
+        val shorts: Map[String, Optional] = command.optionals.collect {
+          case opt: Optional if opt.short.isDefined =>
+            opt.short.get.toString -> opt
+        }.toMap
+        val remainingPositionals = command.positionals.collect {
+          case pos: Positional => pos
+        }.iterator
+        val subcommands: Map[String, Command] = command.commands.map { cmd =>
+          cmd.name -> cmd
+        }.toMap
 
-        def option(): (String, String) = {
+        def fatal(message: String) = throw new ParseException(message)
+
+        def optional(): Unit = {
           val tok = accept()
           val parts = tok.value.split("=", 2)
           val name = parts(0)
-          val embedded: Maybe[String] =
+          val embedded: Option[String] =
             if (parts.size > 1) Some(parts(1)) else None
           val opt = (tok.kind: @unchecked) match {
             case LONG =>
@@ -99,76 +108,75 @@ object Parser {
 
           if (opt.argumentRequired) {
             embedded match {
-              case Some(value) => opt.long -> value
+              case Some(value) =>
+                addArgument(opt.long, value)
               case None if token.kind == POSITIONAL =>
-                opt.long -> accept().value
+                addArgument(opt.long, accept().value)
               case None =>
                 fatal(
-                  s"option ${opt} requires an argument but ${token.value} found")
+                  s"option ${opt.usage} requires an argument but ${token.value} found")
             }
           } else if (opt.argumentAllowed) {
             embedded match {
-              case Some(value) => opt.long -> value
+              case Some(value) =>
+                addArgument(opt.long, value)
               case None =>
                 if (token.kind == POSITIONAL) {
-                  opt.long -> accept.value
+                  addArgument(opt.long, accept().value)
                 } else {
-                  opt.long -> ""
+                  addArgument(opt.long, "")
                 }
             }
           } else { // no argument allowed
             embedded match {
               case Some(value) =>
                 fatal(
-                  s"no argument allowed for option $opt (it is set to $value)")
-              case None => opt.long -> ""
+                  s"no argument allowed for option ${opt.usage} (it is set to $value)")
+              case None => addArgument(opt.long, "")
             }
           }
         }
 
-        val remainingParameters = command.parameters.iterator
-        def parameter(): (String, String) = {
-          if (remainingParameters.hasNext) {
-            remainingParameters.next.name -> accept().value
+        def positional(): Unit = {
+          if (remainingPositionals.hasNext) {
+            addArgument(
+              remainingPositionals.next.name,
+              accept().value
+            )
           } else {
             fatal(s"too many parameters: '${token.value}'")
           }
         }
 
-        val parsedOptions = new mutable.HashMap[String, String]
-        val parsedParameters = new mutable.HashMap[String, String]
-
-        var escaping = false
-
-        def check(subline: Maybe[CommandLine]): CommandLine = {
-          val remaining = remainingParameters.toList
+        // make sure all required positional parameters have been parsed
+        def checkPositionals(): Unit = {
+          val remaining = remainingPositionals.toList
           if (!remaining.forall(_.required == false)) {
-            val missing = remaining.toList.map(p => s"'${p.name}'")
+            val missing = remaining.map(p => s"'${p.name}'")
             fatal(s"missing parameter(s) ${missing.mkString(", ")}")
-          } else if (!subcommands.isEmpty && subline.isEmpty) {
-            val missing = command.commands.map(c => s"'${c.name}'")
-            fatal(
-              s"command not specified (must be one of ${missing.mkString(", ")})")
-          } else {
-            CommandLine(command.name,
-                        parsedOptions.toMap ++ parsedParameters.toMap,
-                        subline)
           }
         }
 
+        var escaping = false
         @annotation.tailrec
-        def innerLine(): CommandLine = {
+        def innerLine(): Unit = {
           if (token.kind == EOL) {
-            check(None)
+            checkPositionals()
+            if (subcommands.nonEmpty) {
+              val missing = command.commands.map(c => s"'${c.name}'")
+              fatal(
+                s"command not specified (must be one of ${missing.mkString(", ")})")
+            }
+            command.action.get(parsedArguments)
           } else if (escaping) {
-            parsedParameters += parameter()
+            positional()
             innerLine()
           } else if (token.kind == DOUBLE_DASH) {
             escaping = true
             readToken()
             innerLine()
-          } else if (token.kind == POSITIONAL && !remainingParameters.isEmpty) {
-            parsedParameters += parameter()
+          } else if (token.kind == POSITIONAL && remainingPositionals.nonEmpty) {
+            positional()
             innerLine()
           } else if (token.kind == POSITIONAL) {
             if (subcommands.isEmpty) {
@@ -178,15 +186,16 @@ object Parser {
                 case None =>
                   val cmds = command.commands.map(c => s"'${c.name}'")
                   fatal(
-                    s"subcommand '${token.value}' not found (must be one of ${cmds
+                    s"command '${token.value}' not found (must be one of ${cmds
                       .mkString(", ")})")
-                case Some(_) =>
-                  val subline = line(subcommands(accept().value))
-                  check(Some(subline))
+                case Some(cmd) =>
+                  checkPositionals()
+                  readToken()
+                  line(cmd)
               }
             }
           } else if (token.kind == LONG || token.kind == SHORT) {
-            parsedOptions += option()
+            optional()
             innerLine()
           } else {
             fatal(s"unknown token $token")
@@ -195,9 +204,9 @@ object Parser {
         innerLine()
       }
       readToken()
-      Right(line(command))
+      line(command)
     } catch {
-      case ex: ParseException => Left(ex)
+      case ex: ParseException => onError(command, ex.getMessage)
     }
 
 }

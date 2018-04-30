@@ -1,71 +1,66 @@
 package commando
 
-sealed trait Definition
+import commando.completion.Bash
+
+sealed trait Parameter {
+  def usage: String
+}
 
 case class Optional(long: String,
                     short: Option[Char] = None,
-                    parameter: Option[Positional] = None)
-    extends Definition {
-  def argumentAllowed: Boolean = parameter.isDefined
-  def argumentRequired: Boolean = parameter.map(_.required).getOrElse(false)
-  override def toString = {
+                    argumentAllowed: Boolean = false,
+                    argumentRequired: Boolean = false,
+                    parameterName: String = "param")
+    extends Parameter {
+
+  def usage: String = {
     val shortString = short.map(c => s"-$c|").getOrElse("")
-    val argString = parameter match {
-      case None                            => ""
-      case Some(Positional(argName, false)) => s"[=<$argName>]"
-      case Some(Positional(argName, true))  => s"=<$argName>"
+    val paramString = if (argumentRequired) {
+      s"=<$parameterName>"
+    } else if (argumentAllowed) {
+      s"[=<$parameterName>]"
+    } else {
+      ""
     }
-    s"[$shortString--$long$argString]"
+    s"[$shortString--$long$paramString]"
   }
 }
 
-case class Positional(
-    name: String,
-    required: Boolean = true
-) extends Definition {
-  override def toString = if (required) s"<$name>" else s"[<$name>]"
+case class Positional(name: String, required: Boolean = true)
+    extends Parameter {
+  def usage: String = if (required) s"<$name>" else s"[<$name>]"
 }
 
 case class Command(
-                name: String,
-                options: Set[Optional] = Set.empty,
-                parameters: Seq[Positional] = Seq.empty,
-                commands: Set[Command] = Set.empty
-) extends Definition {
-  override def toString = name
+    name: String,
+    optionals: Set[Optional],
+    positionals: Seq[Positional],
+    commands: Set[Command] = Set.empty,
+    action: Option[Command.Arguments => Unit] = None
+) {
 
-  def subusage(level: Int): String = {
-    val optionStrings = options.map { opt =>
-      opt.toString
+  private def subusage(level: Int): String = {
+    val optStrings = optionals.map { opt =>
+      opt.usage
     }
-    val parameterStrings = parameters map { param =>
-      param.toString
+    val posStrings = positionals map { pos =>
+      pos.usage
     }
-    val commandStrings = Seq(commands.map(cmd => cmd.name).mkString("|"))
+    val cmdStrings = Seq(commands.map(cmd => cmd.name).mkString("|"))
 
     val headline =
-      (Seq(name) ++ optionStrings ++ parameterStrings ++ commandStrings)
-        .mkString(" ")
-    val sublines = commands
+      (Seq(name) ++ optStrings ++ posStrings ++ cmdStrings).mkString(" ")
+    val lines = commands
       .map(_.subusage(level + 1))
       .map(line => "    " * (level + 1) + line)
-    headline + sublines.mkString("\n", "", "")
+    headline + lines.mkString("\n", "", "")
   }
 
-  def usage: String = "Usage: " + subusage(0)
+  def usage: String = subusage(0)
 
-  def completion: String = commando.completion.Bash.completion(this)
-
+  def completion: String = Bash.completion(this)
 }
+
 object Command {
-
-  def apply(name: String, defs: Definition*): Command = {
-    Command(
-      name,
-      options = defs.collect { case opt: Optional         => opt }.toSet,
-      parameters = defs.collect { case param: Positional => param }.toSeq,
-      commands = defs.collect { case cmd: Command       => cmd }.toSet
-    )
-  }
-
+  type Arguments = Map[String, Seq[String]]
 }
