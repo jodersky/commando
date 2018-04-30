@@ -17,7 +17,7 @@ lazy val commando = crossProject(JSPlatform, JVMPlatform, NativePlatform)
     scalaVersion := crossScalaVersions.value.head
   )
   .jsSettings(
-    crossScalaVersions := "2.11.12" :: Nil
+    crossScalaVersions := "2.12.5" :: "2.11.12" :: Nil
   )
   .jvmSettings(
     crossScalaVersions := "2.12.5" :: "2.11.12" :: Nil
