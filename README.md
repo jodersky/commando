@@ -1,6 +1,14 @@
+[![Build Status](https://travis-ci.org/jodersky/commando.svg?branch=master)](https://travis-ci.org/jodersky/commando)
+
 # Commando
 
 An opinionated command line parsing utility for Scala.
+
+```scala
+libraryDependencies += "io.crashbox" %% "commando" % "<latest_version>"
+```
+
+Commando is available for Scala, Scala JS and Scala Native.
 
 ## Concepts
 Commando's API is designed around two main concepts: commands and
