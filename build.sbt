@@ -7,8 +7,8 @@ lazy val commando = crossProject(JSPlatform, JVMPlatform, NativePlatform)
   .in(file("."))
   .settings(
     scalacOptions ++= Seq(
-    "-deprecation",
-    "-feature"
+      "-deprecation",
+      "-feature"
     ),
     libraryDependencies ++= Seq(
       "com.lihaoyi" %%% "utest" % "0.6.3" % "test"

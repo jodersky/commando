@@ -2,10 +2,11 @@ package commando
 
 class CommandBuilder(name: String, params: Seq[Parameter]) {
 
-  private def optionals = params.collect{
-    case opt: Optional => opt
-  }.toSet
-  private def positionals = params.collect{
+  private def optionals =
+    params.collect {
+      case opt: Optional => opt
+    }.toSet
+  private def positionals = params.collect {
     case pos: Positional => pos
   }
 
@@ -17,32 +18,33 @@ class CommandBuilder(name: String, params: Seq[Parameter]) {
 
 }
 
-
-
 object `package` {
 
-  val DefaultErrorHandler: (Command, String) => Unit = (command: Command, err: String) => {
-    System.err.println(s"${command.name}: $err")
-    System.exit(2)
-  }
-
-
+  val DefaultErrorHandler: (Command, String) => Unit =
+    (command: Command, err: String) => {
+      System.err.println(s"${command.name}: $err")
+      System.exit(2)
+    }
 
   def parse(arguments: Seq[String],
-            command: Command, onError: (Command, String) => Unit = DefaultErrorHandler): Unit =
+            command: Command,
+            onError: (Command, String) => Unit = DefaultErrorHandler): Unit =
     Parser.parse(arguments, command, onError)
 
-  def cmd(name: String)(params: Parameter*): CommandBuilder = new CommandBuilder(name, params)
-  def opt(name: String, short: Char = '\u0000', param: (String, Boolean) = ("", false)): Optional =
+  def cmd(name: String)(params: Parameter*): CommandBuilder =
+    new CommandBuilder(name, params)
+  def opt(name: String,
+          short: Char = '\u0000',
+          param: (String, Boolean) = ("", false)): Optional =
     Optional(
       name,
       if (short == '\u0000') None else Some(short),
       argumentAllowed = (param != ("", false)),
       argumentRequired = (param != ("", false)) && param._2,
-      parameterName = if(param._1 == "") "param" else param._1
+      parameterName = if (param._1 == "") "param" else param._1
     )
 
-  def pos(name: String, required: Boolean = true): Positional = Positional(name, required)
-
+  def pos(name: String, required: Boolean = true): Positional =
+    Positional(name, required)
 
 }

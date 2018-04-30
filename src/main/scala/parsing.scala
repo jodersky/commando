@@ -101,9 +101,9 @@ object Parser {
             if (parts.size > 1) Some(parts(1)) else None
           val opt = (tok.kind: @unchecked) match {
             case LONG =>
-              longs.getOrElse(name, fatal(s"option --$name unknown"))
+              longs.getOrElse(name, fatal(s"unknown option '--$name'"))
             case SHORT =>
-              shorts.getOrElse(name, fatal(s"option -$name unknown"))
+              shorts.getOrElse(name, fatal(s"unknown option '-$name'"))
           }
 
           if (opt.argumentRequired) {
@@ -144,7 +144,7 @@ object Parser {
               accept().value
             )
           } else {
-            fatal(s"too many parameters: '${token.value}'")
+            fatal(s"too many arguments: '${token.value}'")
           }
         }
 
@@ -180,7 +180,7 @@ object Parser {
             innerLine()
           } else if (token.kind == POSITIONAL) {
             if (subcommands.isEmpty) {
-              fatal(s"too many parameters: '${token.value}'")
+              fatal(s"too many arguments: '${token.value}'")
             } else {
               subcommands.get(token.value) match {
                 case None =>
