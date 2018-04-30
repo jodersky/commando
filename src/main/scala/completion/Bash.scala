@@ -4,7 +4,7 @@ package completion
 object Bash {
 
   private def addCommands(command: Command): String = {
-    command.commands.map(c => s"""commands+=("$c")\n""").mkString
+    command.commands.map(c => s"""commands+=("${c.name}")\n""").mkString
   }
 
   private def addFlags(command: Command): String = {
