@@ -5,7 +5,7 @@ jdk:
   - oraclejdk8
 
 before_install:
-  - curl https://raw.githubusercontent.com/scala-native/scala-native/68122ea1ce88ff0ccfb94cbbcd4dae34b68f21cf/scripts/travis_setup.sh | bash -x
+  - curl https://raw.githubusercontent.com/scala-native/scala-native/4c2ce46242f872f3e7879810565147c4233cd52e/scripts/travis_setup.sh | bash -x
 
 env:
   global:

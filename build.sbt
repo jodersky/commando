@@ -11,16 +11,16 @@ lazy val commando = crossProject(JSPlatform, JVMPlatform, NativePlatform)
       "-feature"
     ),
     libraryDependencies ++= Seq(
-      "com.lihaoyi" %%% "utest" % "0.6.3" % "test"
+      "com.lihaoyi" %%% "utest" % "0.6.6" % "test"
     ),
     testFrameworks += new TestFramework("utest.runner.Framework"),
     scalaVersion := crossScalaVersions.value.head
   )
   .jsSettings(
-    crossScalaVersions := "2.12.5" :: "2.11.12" :: Nil
+    crossScalaVersions := "2.12.8" :: "2.11.12" :: Nil
   )
   .jvmSettings(
-    crossScalaVersions := "2.12.5" :: "2.11.12" :: Nil
+    crossScalaVersions := "2.12.8" :: "2.11.12" :: Nil
   )
   .nativeSettings(
     crossScalaVersions := "2.11.12" :: Nil,
