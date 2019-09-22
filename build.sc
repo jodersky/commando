@@ -1,6 +1,6 @@
-import mill._, scalalib._, scalafmt._
+import mill._, scalalib._, scalafmt._, scalalib.publish._
 
-object commando extends ScalaModule with ScalafmtModule {
+object commando extends ScalaModule with ScalafmtModule with PublishModule {
   override def scalaVersion = "2.13.1"
 
   object test extends Tests {
@@ -9,5 +9,17 @@ object commando extends ScalaModule with ScalafmtModule {
     )
     def testFrameworks = Seq("utest.runner.Framework")
   }
+
+  def publishVersion = "0.2.0"
+  def pomSettings = PomSettings(
+    description = "Simple command line parsing.",
+    organization = "io.crashbox",
+    url = "https://github.com/jodersky/commando",
+    licenses = Seq(License.`BSD-3-Clause`),
+    versionControl = VersionControl.github("jodersky", "commando"),
+    developers = Seq(
+      Developer("jodersky", "Jakob Odersky","https://github.com/jodersky")
+    )
+  )
 
 }
