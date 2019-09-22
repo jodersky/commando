@@ -1,24 +1,34 @@
 package commando
+import scala.annotation.meta.param
+
+object Command {
+  case class ParseError(message: String) extends RuntimeException(message)
+}
 
 class Command(val name: String) {
   import Command._
   import collection.mutable
 
-  private case class Parameter(
-      var named: Boolean,
+  private case class NamedParameter(
       var name: String,
       var short: Option[Char],
       var argName: String,
       var acceptsArg: Boolean,
       var requiresArg: Boolean,
-      var required: Boolean,
-      var repeated: Boolean,
       var action: Option[String] => Unit
   )
 
-  class NamedBuilder(param: Parameter) {
-    def require() = { param.required = true; this }
-    def repeat() = { param.repeated = true; this }
+  private case class PositionalParameter(
+      var name: String,
+      var optional: Boolean,
+      var repeated: Boolean,
+      var action: String => Unit
+  )
+
+  private val namedParams = mutable.ListBuffer.empty[NamedParameter]
+  private val posParams = mutable.ListBuffer.empty[PositionalParameter]
+
+  class NamedBuilder(param: NamedParameter) {
     def action(fct: () => Unit) = { param.action = opt => fct(); this }
 
     def arg(name: String) = {
@@ -31,62 +41,63 @@ class Command(val name: String) {
     }
   }
 
-  class NamedArgBuilder(param: Parameter) {
-    def require() = { param.required = true; this }
-    def repeat() = { param.repeated = true; this }
-
+  class NamedArgBuilder(param: NamedParameter) {
     def action(fct: String => Unit) = {
       param.action = opt => fct(opt.get); this
     }
   }
-  class NamedOptArgBuilder(param: Parameter) {
-    def require() = { param.required = true; this }
-    def repeat() = { param.repeated = true; this }
-
+  class NamedOptArgBuilder(param: NamedParameter) {
     def action(fct: Option[String] => Unit) = { param.action = fct; this }
   }
 
-  class PositionalBuilder(param: Parameter) {
-    def optional() = { param.required = false; this }
-    def repeat() = { param.repeated = true; param.required = false; this }
+  class PositionalBuilder(param: PositionalParameter) {
+    def optional() = { param.optional = true; this }
+    def repeat() = { param.repeated = true; this }
 
-    def action(fct: String => Unit) = {
-      param.action = opt => fct(opt.get); this
-    }
+    def action(fct: String => Unit) = { param.action = fct; this }
   }
-
-  private val params = mutable.ListBuffer.empty[Parameter]
 
   def named(name: String, short: Char = 0): NamedBuilder = {
     val shortName = if (short == 0) None else Some(short)
-    val param =
-      Parameter(true, name, shortName, "", false, false, false, false, _ => ())
-    params += param
+    val param = NamedParameter(name, shortName, "", false, false, _ => ())
+    namedParams += param
     new NamedBuilder(param)
   }
 
   def positional(name: String): PositionalBuilder = {
-    val param =
-      Parameter(false, name, None, "", false, false, true, false, _ => ())
-    params += param
+    val param = PositionalParameter(name, false, false, _ => ())
+    posParams += param
     new PositionalBuilder(param)
   }
 
-  /** Raise a fatal parse error. This will call parsing to fail with
+  /** Raise a fatal parse error. This will cause parsing to fail with
     * the given message.
     */
   def error(message: String): Nothing = throw new ParseError(message)
 
-  /** Parse this command wrt the given arguments.
+  private val checks = mutable.ListBuffer.empty[() => Unit]
+
+  /** Add a post-codition check.
+    *
+    * This function will get run after parsing
+    * is complete, but before any parameter actions are invoked.
+    *
+    * Use the error() function in a check to signal that it failed.
+    */
+  def check(checkFct: => Unit) = { checks += (() => checkFct) }
+
+  /** Parse this command against the given arguments.
     *
     * Returns 'None' if parsing was successful, or an error message otherwise.
     */
   def parse(args: Iterable[String]): Option[String] =
     try {
-      var (named, positional) = params.toList.partition(_.named)
+      val named = namedParams.result()
+      var positional = posParams.result()
 
-      // keeps track of which parameters have already been set
-      val seen: mutable.Set[Parameter] = mutable.Set.empty[Parameter]
+      val namedQueue =
+        mutable.ListBuffer.empty[(NamedParameter, Option[String])]
+      val posQueue = mutable.ListBuffer.empty[(PositionalParameter, String)]
 
       val it = args.iterator
       var arg = ""
@@ -96,58 +107,47 @@ class Command(val name: String) {
 
       var escaping = false
 
-      def process(param: Parameter, value: Option[String]) = {
-        param.action(value)
-      }
-
       def readPositional(arg: String) =
         if (positional.isEmpty) {
           error("too many arguments")
         } else {
-          process(positional.head, Some(arg))
-          seen += positional.head
+          posQueue += positional.head -> arg
+          //seen += positional.head
           if (!positional.head.repeated) {
             positional = positional.tail
           }
           next()
         }
 
-      def getNamed(
-          filter: Parameter => Boolean,
-          friendlyName: String
-      ): Parameter = named.find(filter) match {
-        case None => error(s"unknown parameter: '$friendlyName'")
-        case Some(param) if (!param.repeated && seen.contains(param)) =>
-          error(
-            s"parameter '$friendlyName' has already been given and repetitions are not allowed"
-          )
-        case Some(param) =>
-          seen += param
-          param
-      }
+      def getLong(name: String): NamedParameter =
+        named.find(_.name == name) match {
+          case None        => error(s"unknown parameter: --$name")
+          case Some(param) => param
+        }
+      def getShort(name: Char): NamedParameter =
+        named.find(_.short == Some(name)) match {
+          case None        => error(s"unknown parameter: -$name")
+          case Some(param) => param
+        }
 
-      def getLong(name: String): Parameter =
-        getNamed(p => p.name == name, s"--$name")
-      def getShort(name: Char): Parameter =
-        getNamed(p => p.short == Some(name), s"-$name")
-
-      def readNamed(param: Parameter, friendlyName: String) = {
+      def readNamed(param: NamedParameter, given: String) = {
         next()
         val nextIsArg = !done && (!arg.startsWith("-") || arg == "--")
 
         if (param.requiresArg && nextIsArg) {
-          process(param, Some(arg))
+          namedQueue += param -> Some(arg)
           next()
         } else if (param.requiresArg && !nextIsArg) {
-          error(s"parameter '$friendlyName' requires an argument")
+          error(s"parameter '$given' requires an argument")
         } else if (param.acceptsArg && nextIsArg) {
-          process(param, Some(arg))
+          namedQueue += param -> Some(arg)
           next()
         } else {
-          process(param, None)
+          namedQueue += param -> None
         }
       }
 
+      // parse arguments
       while (!done) {
         if (escaping == true) {
           readPositional(arg)
@@ -159,13 +159,13 @@ class Command(val name: String) {
             case Array(name, embeddedValue) =>
               val param = getLong(name)
               if (param.acceptsArg) {
-                process(param, Some(embeddedValue))
+                namedQueue += param -> Some(embeddedValue)
                 next()
               } else {
-                error(s"parameter '--$name' does not accept an argument")
+                error(s"parameter '$arg' does not accept an argument")
               }
             case Array(name) =>
-              readNamed(getLong(name), s"--$name")
+              readNamed(getLong(name), arg)
           }
         } else if (arg.startsWith("-") && arg != "-") {
           val chars = arg.drop(1)
@@ -176,7 +176,7 @@ class Command(val name: String) {
                 s"only flags are allowed when multiple short parameters are given: $chars"
               )
             } else {
-              params.foreach(p => process(p, None))
+              params.foreach(p => namedQueue += p -> None)
               next()
             }
           } else {
@@ -187,18 +187,37 @@ class Command(val name: String) {
         }
       }
 
-      for (param <- params) {
-        if (param.required && !seen.contains(param))
-          error(s"missing parameter: '${param.name}'")
+      // there should only be optional positional parameters left at this point
+      for (p <- positional) {
+        if (!p.optional && !p.repeated) error(s"missing parameter: '${p.name}'")
       }
+      for (check <- checks) {
+        check()
+      }
+
+      // process arguments
+      for ((p, v) <- namedQueue) {
+        p.action(v)
+      }
+      for ((p, v) <- posQueue) {
+        p.action(v)
+      }
+
       None
     } catch {
       case ParseError(message) => Some(message)
     }
 
   def completion(): String = {
-    val completions: List[String] = params.toList.filter(_.named).flatMap {
-      param =>
+    val named = namedParams.result()
+
+    val completions: List[String] =
+      named.flatMap { param =>
+        param.short match {
+          case Some(s) => List(s"-$s")
+          case None    => Nil
+        }
+      }.sorted ::: named.flatMap { param =>
         if (param.requiresArg) {
           List(s"--${param.name}=")
         } else if (param.acceptsArg) {
@@ -206,7 +225,7 @@ class Command(val name: String) {
         } else {
           List(s"--${param.name}")
         }
-    }
+      }.sorted
 
     s"""|_${name}_complete() {
         |  local cur_word param_list
@@ -214,16 +233,11 @@ class Command(val name: String) {
         |  param_list="${completions.mkString(" ")}"
         |  if [[ $${cur_word} == -* ]]; then
         |    COMPREPLY=( $$(compgen -W "$$param_list" -- $${cur_word}) )
-        |  else
-        |    COMPREPLY=()
+        |    return 0
         |  fi
-        |  return 0
         |}
-        |complete -F _${name}_complete ${name}
+        |complete -F _${name}_complete -o default ${name}
         |""".stripMargin
   }
 
-}
-object Command {
-  case class ParseError(message: String) extends RuntimeException(message)
 }

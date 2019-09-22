@@ -87,31 +87,9 @@ object CommandTests extends TestSuite {
       assert(eval(cmd5, "a" :: "b" :: "c" :: Nil))
       assert(cmd5.one == Some("a") && cmd5.two == Some("c"))
     }
-    "named flag optional" - {
+    "named flag" - {
       val cmd = new Command("cmd") {
         named("param")
-      }
-      assert(eval(cmd, Nil))
-      assert(!eval(cmd, "" :: Nil))
-      assert(eval(cmd, "--param" :: Nil))
-      assert(!eval(cmd, "--param" :: "" :: Nil))
-      assert(!eval(cmd, "--param" :: "--param" :: Nil))
-      assert(!eval(cmd, "--param" :: "--param" :: "a" :: Nil))
-    }
-    "named flag required" - {
-      val cmd = new Command("cmd") {
-        named("param").require()
-      }
-      assert(!eval(cmd, Nil))
-      assert(!eval(cmd, "" :: Nil))
-      assert(eval(cmd, "--param" :: Nil))
-      assert(!eval(cmd, "--param" :: "" :: Nil))
-      assert(!eval(cmd, "--param" :: "--param" :: Nil))
-      assert(!eval(cmd, "--param" :: "--param" :: "a" :: Nil))
-    }
-    "named flag repeated" - {
-      val cmd = new Command("cmd") {
-        named("param").repeat()
       }
       assert(eval(cmd, Nil))
       assert(!eval(cmd, "" :: Nil))

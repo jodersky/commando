@@ -5,11 +5,9 @@ object Main extends App {
   val cmd = new commando.Command("xorc") {
     val version = named("version", 'V')
       .action(() => println("version 1"))
-      .repeat()
 
     named("verbose", 'v')
       .optionalArg("level")
-      .repeat()
       .action(level => println(s"level $level"))
 
     positional("FILES")
@@ -22,6 +20,7 @@ object Main extends App {
 
     val comp = named("completion")
       .action(() => println(completion()))
+
   }
   cmd.parse(args) match {
     case None =>
