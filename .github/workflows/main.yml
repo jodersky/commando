@@ -9,10 +9,14 @@ jobs:
     
     steps:
     - uses: actions/checkout@v1
-    - name: Run a one-line script
-      run: echo Hello, world!
-    - name: Run a multi-line script
+    - name: Import key
+      run: echo "${{secrets.GPG_KEY}}" | gpg --import
+    - name: Setup mill
       run: |
-        echo Add other actions to build,
-        echo test, and deploy your project.
-    - uses: ./ci
+        curl -L https://github.com/lihaoyi/mill/releases/download/0.5.1/0.5.1 | sudo tee /usr/local/bin/mill > /dev/null
+        sudo chmod +x /usr/local/bin/mill
+    - name: Run tests
+      run: mill commando.test
+    - name: Publish
+      run: mill mill.scalalib.PublishModule/publishAll --sonatypeCreds "8VNUX6+2:${{secrets.dummy}}" --publishArtifacts __.publishArtifacts
+    - uses: ./ci/test
