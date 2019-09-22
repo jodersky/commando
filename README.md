@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/jodersky/commando.svg?branch=master)](https://travis-ci.org/jodersky/commando)
+[![Build Status](https://github.com/jodersky/commando/workflows/CI/badge.svg)](https://github.com/jodersky/commando/actions)
 
 # Commando
 
