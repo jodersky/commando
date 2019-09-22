@@ -1,7 +1,7 @@
 import mill._, scalalib._, scalafmt._
 
 object commando extends ScalaModule with ScalafmtModule {
-  override def scalaVersion = "2.13.0"
+  override def scalaVersion = "2.13.1"
 
   object test extends Tests {
     def ivyDeps = Agg(
