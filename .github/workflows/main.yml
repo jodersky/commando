@@ -3,20 +3,24 @@ name: CI
 on: [push]
 
 jobs:
-  build:
 
+  build:
     runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v1
     - name: Import key
       run: echo "${{secrets.GPG_KEY}}" | gpg --import
-    - name: Setup mill
-      run: |
-        curl -L https://github.com/lihaoyi/mill/releases/download/0.5.1/0.5.1 | sudo tee /usr/local/bin/mill > /dev/null
-        sudo chmod +x /usr/local/bin/mill
-    - name: Run tests
-      run: mill commando.test
-    - name: Publish
-      run: mill mill.scalalib.PublishModule/publishAll --sonatypeCreds "8VNUX6+2:${{secrets.dummy}}" --publishArtifacts __.publishArtifacts
-    - uses: ./ci/test
+    - name: run tests
+      uses: ./ci/mill
+      with:
+        args: commando.test
+    # - name: Setup mill
+    #   run: |
+    #     curl -L https://github.com/lihaoyi/mill/releases/download/0.5.1/0.5.1 | sudo tee /usr/local/bin/mill > /dev/null
+    #     sudo chmod +x /usr/local/bin/mill
+    # - name: Run tests
+    #   run: mill commando.test
+    # - name: Publish
+    #   run: mill mill.scalalib.PublishModule/publishAll --sonatypeCreds "8VNUX6+2:${{secrets.dummy}}" --publishArtifacts __.publishArtifacts
+    # - uses: ./ci/test
