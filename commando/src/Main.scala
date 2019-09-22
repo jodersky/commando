@@ -3,12 +3,13 @@ package example
 object Main extends App {
 
   val cmd = new commando.Command("xorc") {
-    val version = named("version")
+    val version = named("version", 'V')
       .action(() => println("version 1"))
       .repeat()
 
-    named("verbose")
+    named("verbose", 'v')
       .optionalArg("level")
+      .repeat()
       .action(level => println(s"level $level"))
 
     positional("FILES")

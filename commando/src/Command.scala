@@ -7,7 +7,7 @@ class Command(val name: String) {
   private case class Parameter(
       var named: Boolean,
       var name: String,
-      var aliases: List[String],
+      var short: Option[Char],
       var argName: String,
       var acceptsArg: Boolean,
       var requiresArg: Boolean,
@@ -17,7 +17,6 @@ class Command(val name: String) {
   )
 
   class NamedBuilder(param: Parameter) {
-    def alias(aliases: String*) = { param.aliases ++= aliases; this }
     def require() = { param.required = true; this }
     def repeat() = { param.repeated = true; this }
     def action(fct: () => Unit) = { param.action = opt => fct(); this }
@@ -33,7 +32,6 @@ class Command(val name: String) {
   }
 
   class NamedArgBuilder(param: Parameter) {
-    def alias(aliases: String*) = { param.aliases ++= aliases; this }
     def require() = { param.required = true; this }
     def repeat() = { param.repeated = true; this }
 
@@ -42,7 +40,6 @@ class Command(val name: String) {
     }
   }
   class NamedOptArgBuilder(param: Parameter) {
-    def alias(aliases: String*) = { param.aliases ++= aliases; this }
     def require() = { param.required = true; this }
     def repeat() = { param.repeated = true; this }
 
@@ -60,22 +57,30 @@ class Command(val name: String) {
 
   private val params = mutable.ListBuffer.empty[Parameter]
 
-  def named(name: String): NamedBuilder = {
+  def named(name: String, short: Char = 0): NamedBuilder = {
+    val shortName = if (short == 0) None else Some(short)
     val param =
-      Parameter(true, name, Nil, "", false, false, false, false, _ => ())
+      Parameter(true, name, shortName, "", false, false, false, false, _ => ())
     params += param
     new NamedBuilder(param)
   }
 
   def positional(name: String): PositionalBuilder = {
     val param =
-      Parameter(false, name, Nil, "", false, false, true, false, _ => ())
+      Parameter(false, name, None, "", false, false, true, false, _ => ())
     params += param
     new PositionalBuilder(param)
   }
 
+  /** Raise a fatal parse error. This will call parsing to fail with
+    * the given message.
+    */
   def error(message: String): Nothing = throw new ParseError(message)
 
+  /** Parse this command wrt the given arguments.
+    *
+    * Returns 'None' if parsing was successful, or an error message otherwise.
+    */
   def parse(args: Iterable[String]): Option[String] =
     try {
       var (named, positional) = params.toList.partition(_.named)
@@ -104,58 +109,81 @@ class Command(val name: String) {
           if (!positional.head.repeated) {
             positional = positional.tail
           }
+          next()
         }
 
-      def getNamed(name: String): Parameter = {
-        named.find(p => p.name == name || p.aliases.contains(name)) match {
-          case None => error(s"unknown parameter: '$name'")
-          case Some(param) if (!param.repeated && seen.contains(param)) =>
-            error(
-              s"parameter '$name' has already been given and repetitions are not allowed"
-            )
-          case Some(param) =>
-            seen += param
-            param
+      def getNamed(
+          filter: Parameter => Boolean,
+          friendlyName: String
+      ): Parameter = named.find(filter) match {
+        case None => error(s"unknown parameter: '$friendlyName'")
+        case Some(param) if (!param.repeated && seen.contains(param)) =>
+          error(
+            s"parameter '$friendlyName' has already been given and repetitions are not allowed"
+          )
+        case Some(param) =>
+          seen += param
+          param
+      }
+
+      def getLong(name: String): Parameter =
+        getNamed(p => p.name == name, s"--$name")
+      def getShort(name: Char): Parameter =
+        getNamed(p => p.short == Some(name), s"-$name")
+
+      def readNamed(param: Parameter, friendlyName: String) = {
+        next()
+        val nextIsArg = !done && (!arg.startsWith("-") || arg == "--")
+
+        if (param.requiresArg && nextIsArg) {
+          process(param, Some(arg))
+          next()
+        } else if (param.requiresArg && !nextIsArg) {
+          error(s"parameter '$friendlyName' requires an argument")
+        } else if (param.acceptsArg && nextIsArg) {
+          process(param, Some(arg))
+          next()
+        } else {
+          process(param, None)
         }
       }
 
       while (!done) {
         if (escaping == true) {
           readPositional(arg)
-          next()
         } else if (arg == "--") {
           escaping = true
           next()
         } else if (arg.startsWith("--")) {
           arg.drop(2).split("=", 2) match {
             case Array(name, embeddedValue) =>
-              val param = getNamed(name)
+              val param = getLong(name)
               if (param.acceptsArg) {
                 process(param, Some(embeddedValue))
                 next()
               } else {
-                error(s"parameter '$name' does not accept an argument")
+                error(s"parameter '--$name' does not accept an argument")
               }
             case Array(name) =>
-              val param = getNamed(name)
+              readNamed(getLong(name), s"--$name")
+          }
+        } else if (arg.startsWith("-") && arg != "-") {
+          val chars = arg.drop(1)
+          val params = chars.map(c => getShort(c))
+          if (params.length > 1) {
+            if (!params.forall(!_.acceptsArg)) {
+              error(
+                s"only flags are allowed when multiple short parameters are given: $chars"
+              )
+            } else {
+              params.foreach(p => process(p, None))
               next()
-              val nextIsArg = !done && (!arg.startsWith("-") || arg == "--")
-
-              if (param.requiresArg && nextIsArg) {
-                process(param, Some(arg))
-                next()
-              } else if (param.requiresArg && !nextIsArg) {
-                error(s"parameter '$name' requires an argument")
-              } else if (param.acceptsArg && nextIsArg) {
-                process(param, Some(arg))
-                next()
-              } else {
-                process(param, None)
-              }
+            }
+          } else {
+            readNamed(params.head, s"-${chars.head}")
           }
         } else {
           readPositional(arg)
-          next()
         }
       }
 
