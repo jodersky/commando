@@ -5,7 +5,7 @@ object Command {
   case class ParseError(message: String) extends RuntimeException(message)
 }
 
-class Command(val name: String) {
+class Command(val name: String, val description: String = "") {
   import Command._
   import collection.mutable
 
@@ -15,7 +15,8 @@ class Command(val name: String) {
       var argName: String,
       var acceptsArg: Boolean,
       var requiresArg: Boolean,
-      var action: Option[String] => Unit
+      var action: Option[String] => Unit,
+      var info: String
   )
 
   private case class PositionalParameter(
@@ -30,6 +31,7 @@ class Command(val name: String) {
 
   class NamedBuilder(param: NamedParameter) {
     def action(fct: () => Unit) = { param.action = opt => fct(); this }
+    def info(text: String) = { param.info = text; this }
 
     def arg(name: String) = {
       param.argName = name; param.acceptsArg = true; param.requiresArg = true;
@@ -45,9 +47,11 @@ class Command(val name: String) {
     def action(fct: String => Unit) = {
       param.action = opt => fct(opt.get); this
     }
+    def info(text: String) = { param.info = text; this }
   }
   class NamedOptArgBuilder(param: NamedParameter) {
     def action(fct: Option[String] => Unit) = { param.action = fct; this }
+    def info(text: String) = { param.info = text; this }
   }
 
   class PositionalBuilder(param: PositionalParameter) {
@@ -59,7 +63,7 @@ class Command(val name: String) {
 
   def named(name: String, short: Char = 0): NamedBuilder = {
     val shortName = if (short == 0) None else Some(short)
-    val param = NamedParameter(name, shortName, "", false, false, _ => ())
+    val param = NamedParameter(name, shortName, "", false, false, _ => (), "")
     namedParams += param
     new NamedBuilder(param)
   }
@@ -238,6 +242,67 @@ class Command(val name: String) {
         |}
         |complete -F _${name}_complete -o default ${name}
         |""".stripMargin
+  }
+
+  def usage(): String = {
+    val named = namedParams.result()
+    val positional = posParams.result()
+
+    val b = new mutable.StringBuilder
+
+    // headline
+    b.append("Usage: ")
+    b.append(name);
+    if (!named.isEmpty) {
+      b.append(" [options]")
+    }
+    for (pos <- positional) {
+      b.append(" ")
+      if (pos.optional) {
+        b.append("["); b.append(pos.name); b.append("]")
+      } else {
+        b.append(pos.name)
+      }
+      if (pos.repeated) {
+        b.append("...")
+      }
+    }
+
+    // command description
+    if (!description.isEmpty) {
+      b.append("\n\n")
+      b.append(description)
+    }
+
+    // parameters
+    if (!named.isEmpty) {
+      b.append("\n\nOptions:\n")
+
+      named.sortBy(_.name).foreach { param =>
+        val short = param.short.map(c => s"  -$c, ").getOrElse("      ")
+        val long = if (param.requiresArg) {
+          s"--${param.name}=${param.argName}"
+        } else if (param.acceptsArg) {
+          s"--${param.name}[=${param.argName}]"
+        } else {
+          s"--${param.name}"
+        }
+
+        b.append("\n")
+        if (long.length <= 22) {
+          b.append(short)
+          b.append(f"$long%-22s  ")
+          b.append(param.info)
+        } else {
+          b.append(short)
+          b.append(f"$long\n")
+          b.append(" " * 30)
+          b.append(param.info)
+        }
+
+      }
+    }
+    b.result()
   }
 
 }
