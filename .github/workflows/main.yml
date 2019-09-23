@@ -1,34 +1,30 @@
 name: CI
 
-on: [push]
+on:
+  pull_request:
+  push:
+      branches:
+        - master
+      tags:
+        - v*
 
 jobs:
 
   build:
     runs-on: ubuntu-latest
-    
     steps:
+
     - uses: actions/checkout@v1
+
     - uses: jodersky/setup-mill@master
-    - name: Import key
-      run: echo "${{secrets.GPG_KEY}}" | gpg --import
-    - name: Build
-      run: mill commando.compile
-    - name: assemble
-      run: mill commando.assembly
+
     - name: Test
       run: mill commando.test
-    - run: ls -lah out
-    - run: ls -lah out/commando
-    - run: ls -lah out/commando/assembly/dest
-    
-    
-    # - name: Setup mill
-    #   run: |
-    #     curl -L https://github.com/lihaoyi/mill/releases/download/0.5.1/0.5.1 | sudo tee /usr/local/bin/mill > /dev/null
-    #     sudo chmod +x /usr/local/bin/mill
-    # - name: Run tests
-    #   run: mill commando.test
-    # - name: Publish
-    #   run: mill mill.scalalib.PublishModule/publishAll --sonatypeCreds "8VNUX6+2:${{secrets.dummy}}" --publishArtifacts __.publishArtifacts
-    # - uses: ./ci/test
+
+    - name: Publish Tag
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        echo "${{secrets.GPG_KEY}}" | gpg --import
+        mill mill.scalalib.PublishModule/publishAll \
+          --sonatypeCreds "8VNUX6+2:${{secrets.SONATYPE_PASSWORD}}" \
+          --publishArtifacts __.publishArtifacts

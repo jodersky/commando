@@ -10,7 +10,7 @@ object commando extends ScalaModule with ScalafmtModule with PublishModule {
     def testFrameworks = Seq("utest.runner.Framework")
   }
 
-  def publishVersion = "0.2.0"
+  def publishVersion = os.proc("git", "describe", "--match=v*").call().out.trim.tail
   def pomSettings = PomSettings(
     description = "Simple command line parsing.",
     organization = "io.crashbox",
