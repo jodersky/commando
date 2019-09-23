@@ -14,10 +14,13 @@ jobs:
       run: echo "${{secrets.GPG_KEY}}" | gpg --import
     - name: Build
       run: mill commando.compile
+    - name: assemble
+      run: mill commando.assembly
     - name: Test
       run: mill commando.test
-    - name: ls
-      run: ls -lah .
+    - run: ls -lah out
+    - run: ls -lah out/commando
+    - run: ls -lah out/commando/assembly/dest
     
     
     # - name: Setup mill
