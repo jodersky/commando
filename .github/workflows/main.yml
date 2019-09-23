@@ -12,11 +12,14 @@ jobs:
     - uses: jodersky/setup-mill@master
     - name: Import key
       run: echo "${{secrets.GPG_KEY}}" | gpg --import
-    - name: Compile
+    - name: Build
       run: mill commando.compile
     - name: Test
       run: mill commando.test
-
+    - name: ls
+      run: ls -lah .
+    
+    
     # - name: Setup mill
     #   run: |
     #     curl -L https://github.com/lihaoyi/mill/releases/download/0.5.1/0.5.1 | sudo tee /usr/local/bin/mill > /dev/null
