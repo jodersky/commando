@@ -13,7 +13,7 @@ jobs:
   build:
     strategy:
       matrix:
-        scala: ["2.13.1", "2.12.10", "2.11.12"]
+        scala: ["2.13.1", "2.12.10", "2.11.12", "2.10.7"]
     runs-on: ubuntu-latest
     steps:
 
@@ -21,7 +21,11 @@ jobs:
 
     - uses: jodersky/setup-mill@master
 
+    - name: Compile
+      run: mill -D scala.version=${{matrix.scala}} commando.compile
+
     - name: Test
+      if: matrix.scala == '2.13.1'
       run: mill -D scala.version=${{matrix.scala}} commando.test
 
     - name: Publish Tag
