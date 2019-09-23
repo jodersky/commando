@@ -11,6 +11,9 @@ on:
 jobs:
 
   build:
+    strategy:
+      matrix:
+        scala: ["2.13.1", "2.12.10", "2.11.12"]
     runs-on: ubuntu-latest
     steps:
 
@@ -19,12 +22,12 @@ jobs:
     - uses: jodersky/setup-mill@master
 
     - name: Test
-      run: mill commando.test
+      run: mill -D scala.version=${{matrix.scala}} commando.test
 
     - name: Publish Tag
       if: startsWith(github.ref, 'refs/tags/')
       run: |
         echo "${{secrets.GPG_KEY}}" | gpg --import
-        mill mill.scalalib.PublishModule/publishAll \
+        mill -D scala.version=${{matrix.scala}} mill.scalalib.PublishModule/publishAll \
           --sonatypeCreds "8VNUX6+2:${{secrets.SONATYPE_PASSWORD}}" \
           --publishArtifacts __.publishArtifacts
