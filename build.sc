@@ -1,7 +1,11 @@
 import mill._, scalalib._, scalafmt._, scalalib.publish._
 
 object commando extends ScalaModule with ScalafmtModule with PublishModule {
-  override def scalaVersion = "2.13.1"
+  //def scalaVersion = T.input {
+    //scala.sys.props.toMap.getOrElse("scala.version", "2.13.1").call() 
+  //}
+
+  def scalaVersion = "2.13.1"
 
   object test extends Tests {
     def ivyDeps = Agg(
@@ -10,7 +14,7 @@ object commando extends ScalaModule with ScalafmtModule with PublishModule {
     def testFrameworks = Seq("utest.runner.Framework")
   }
 
-  def publishVersion = os.proc("git", "describe", "--match=v*").call().out.trim.tail
+  def publishVersion = T.input{os.proc("git", "describe", "--dirty", "--match=v*").call().out.trim.tail}
   def pomSettings = PomSettings(
     description = "Simple command line parsing.",
     organization = "io.crashbox",
