@@ -9,16 +9,14 @@ jobs:
     
     steps:
     - uses: actions/checkout@v1
+    - uses: jodersky/setup-mill@master
     - name: Import key
       run: echo "${{secrets.GPG_KEY}}" | gpg --import
-    - name: run tests
-      uses: ./ci/mill
-      with:
-        args: commando.compile
-    - name: check caching
-      uses: ./ci/mill
-      with:
-        args: commando.test
+    - name: Compile
+      run: mill commando.compile
+    - name: Test
+      run: mill commando.test
+
     # - name: Setup mill
     #   run: |
     #     curl -L https://github.com/lihaoyi/mill/releases/download/0.5.1/0.5.1 | sudo tee /usr/local/bin/mill > /dev/null
